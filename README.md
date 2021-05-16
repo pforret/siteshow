@@ -48,15 +48,12 @@ Flags, options and parameters:
 
 ## 🚀 Installation
 
-with [basher](https://github.com/basherpm/basher)
-
-	$ basher install pforret/siteshow_pi
-
-or with `git`
-
-	$ git clone https://github.com/pforret/siteshow_pi.git
-	$ cd siteshow_pi
-
+```bash
+$ git clone https://github.com/pforret/siteshow_pi.git
+$ cd siteshow_pi
+$ siteshow_pi install
+# and now reboot
+```
 ## 📝 Acknowledgements
 
 * script created with [bashew](https://github.com/pforret/bashew)
