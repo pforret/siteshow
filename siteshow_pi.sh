@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-### ==============================================================================
-### SO HOW DO YOU PROCEED WITH YOUR SCRIPT?
-### 1. define the options/parameters and defaults you need in list_options()
-### 2. define dependencies on other programs/scripts in list_dependencies()
-### 3. implement the different actions in main() with helper functions
-### 4. implement helper functions you defined in previous step
-### ==============================================================================
-
 ### Created by Peter Forret ( pforret ) on 2021-05-16
 ### Based on https://github.com/pforret/bashew 1.16.4
 script_version="0.0.1" # if there is a VERSION.md in this script's folder, it will take priority for version number
@@ -15,25 +7,6 @@ readonly script_created="2021-05-16"
 readonly run_as_root=-1 # run_as_root: 0 = don't check anything / 1 = script MUST run as root / -1 = script MAY NOT run as root
 
 list_options() {
-  ### Change the next lines to reflect which flags/options/parameters you need
-  ### flag:   switch a flag 'on' / no value specified
-  ###     flag|<short>|<long>|<description>
-  ###     e.g. "-v" or "--verbose" for verbose output / default is always 'off'
-  ###     will be available as $<long> in the script e.g. $verbose
-  ### option: set an option / 1 value specified
-  ###     option|<short>|<long>|<description>|<default>
-  ###     e.g. "-e <extension>" or "--extension <extension>" for a file extension
-  ###     will be available a $<long> in the script e.g. $extension
-  ### list: add an list/array item / 1 value specified
-  ###     list|<short>|<long>|<description>| (default is ignored)
-  ###     e.g. "-u <user1> -u <user2>" or "--user <user1> --user <user2>"
-  ###     will be available a $<long> array in the script e.g. ${user[@]}
-  ### param:  comes after the options
-  ###     param|<type>|<long>|<description>
-  ###     <type> = 1 for single parameters - e.g. param|1|output expects 1 parameter <output>
-  ###     <type> = ? for optional parameters - e.g. param|1|output expects 1 parameter <output>
-  ###     <type> = n for list parameter    - e.g. param|n|inputs expects <input1> <input2> ... <input99>
-  ###     will be available as $<long> in the script after option/param parsing
   echo -n "
 #commented lines will be filtered
 flag|h|help|show usage
@@ -42,8 +15,12 @@ flag|v|verbose|output more
 flag|f|force|do not ask for confirmation (always yes)
 option|l|log_dir|folder for log files |$HOME/log/$script_prefix
 option|t|tmp_dir|folder for temp files|/tmp/$script_prefix
-param|1|action|action to perform: action1/action2
-param|?|input|input file/text
+option|B|browser|browser to use: chromium/firefox|chromium
+option|C|category|screen category|
+option|D|display|display ID|${DISPLAY:-}
+option|I|install|folder for installing scripts|/home/pi
+option|W|wait|wait between pages|30
+param|1|action|action to perform: install/display
 " | grep -v '^#' | grep -v '^\s*$'
 }
 
@@ -56,22 +33,21 @@ main() {
 
   action=$(lower_case "$action")
   case $action in
-  action1)
-    #TIP: use «$script_prefix action1» to ...
-    #TIP:> $script_prefix action1 input.txt
+  install)
+    #TIP: use «$script_prefix install» to install the RPi as a display server
+    #TIP:> $script_prefix install
     # shellcheck disable=SC2154
-    do_action1 "$input"
+    do_install
     ;;
 
-  action2)
-    #TIP: use «$script_prefix action2» to ...
-    #TIP:> $script_prefix action2 input.txt output.pdf
-
+  display)
+    #TIP: use «$script_prefix display» to .start display
+    #TIP:> $script_prefix display
     # shellcheck disable=SC2154
-    do_action2 "$input" "$output"
+    do_display
     ;;
 
-  check|env)
+  check | env)
     ## leave this default action, it will make it easier to test your script
     #TIP: use «$script_prefix check» to check if this script is ready to execute and what values the options/flags are
     #TIP:> $script_prefix check
@@ -100,20 +76,101 @@ main() {
 ## Put your helper scripts here
 #####################################################################
 
-do_action1() {
-  log_to_file "action1 [$input]"
+do_install() {
+  log_to_file "install on machine $(hostname)"
   # Examples of required binaries/scripts and how to install them
   # require_binary "convert" "imagemagick"
   # require_binary "progressbar" "basher install pforret/progressbar"
-  # (code)
+  [[ "$os_name" == "Raspbian" ]] || die "Only works on Raspbian"
+
+  progress "Clean up old packages"
+  sudo apt-get purge wolfram-engine scratch scratch2 nuscratch sonic-pi idle3 smartsim java-common minecraft-pi libreoffice* -y
+  sudo apt-get clean
+  sudo apt-get autoremove -y
+
+  progress "Install new packages"
+  sudo apt-get update
+  sudo apt-get upgrade
+  sudo apt-get install xdotool unclutter sed firefox
+
+  progress "Install service"
+  sudo raspi-config
+  sudo systemctl enable kiosk.service
+  sudo systemctl start kiosk.service
+  # shellcheck disable=SC2154
+  ln -s "$script_install_folder/$script_basename" "$install/$script_basename"
 }
 
-do_action2() {
-  log_to_file "action2 [$input]"
-  # (code)
+do_display() {
+  local hostname
+  hostname="$(hostname)"
 
+  site_list="$script_install_folder/sites/default.txt"
+  # shellcheck disable=SC2154
+  [[ -f "$script_install_folder/sites/$category.txt" ]] && site_list="$script_install_folder/sites/$category.txt"
+  [[ -f "$script_install_folder/sites/$hostname.txt" ]] && site_list="$script_install_folder/sites/$hostname.txt"
+
+  log_to_file "display [$input]"
+  # cf https://pimylifeup.com/raspberry-pi-kiosk/
+  xset s noblank
+  xset s off
+  xset -dpms
+  unclutter -idle 0.5 -root &
+  sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' /home/pi/.config/chromium/Default/Preferences
+  sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/'   /home/pi/.config/chromium/Default/Preferences
+
+  # shellcheck disable=SC2154
+  case "$browser" in
+  "chromium")
+    # shellcheck disable=SC2046
+    /usr/bin/chromium-browser --noerrdialogs --disable-infobars --kiosk $(list_sites "$site_list") &
+    ;;
+  "firefox")
+    # shellcheck disable=SC2046
+    firefox -foreground -fullscreen -private $(list_sites "$site_list") &
+    ;;
+  *)
+    die "Unsupported browser [$browser]"
+  esac
+
+  while true; do
+    xdotool keydown ctrl+Tab
+    xdotool keyup ctrl+Tab
+    # shellcheck disable=SC2154
+    sleep "$wait"
+  done
 }
 
+list_sites(){
+  if [[ -f "$1" ]] ; then
+    grep -v -e "^#" "$1" | grep http | xargs
+  else
+    echo ""
+  fi
+}
+
+service_file() {
+  # shellcheck disable=SC2154
+  debug "service: $browser $script_prefix"
+  cat <<END
+[Unit]
+Description=$browser $script_prefix
+Wants=graphical.target
+After=graphical.target
+
+[Service]
+Environment=DISPLAY=:0.0
+Environment=XAUTHORITY=$install/.Xauthority
+Type=simple
+ExecStart=/bin/bash $install/$script_basename display
+Restart=on-abort
+User=pi
+Group=pi
+
+[Install]
+WantedBy=graphical.target
+END
+}
 
 #####################################################################
 ################### DO NOT MODIFY BELOW THIS LINE ###################
@@ -182,12 +239,19 @@ initialise_output() {
   error_prefix="${col_red}>${col_reset}"
 }
 
-out() {     ((quiet)) && true || printf '%b\n' "$*"; }
-debug() {   if ((verbose)); then out "${col_ylw}# $* ${col_reset}" >&2; else true; fi; }
-die() {     out "${col_red}${char_fail} $script_basename${col_reset}: $*" >&2 ; tput bel ; safe_exit ; }
-alert() {   out "${col_red}${char_alrt}${col_reset}: $*" >&2 ; }
+out() { ((quiet)) && true || printf '%b\n' "$*"; }
+debug() { if ((verbose)); then out "${col_ylw}# $* ${col_reset}" >&2; else true; fi; }
+die() {
+  out "${col_red}${char_fail} $script_basename${col_reset}: $*" >&2
+  tput bel
+  safe_exit
+}
+alert() { out "${col_red}${char_alrt}${col_reset}: $*" >&2; }
 success() { out "${col_grn}${char_succ}${col_reset}  $*"; }
-announce() { out "${col_grn}${char_wait}${col_reset}  $*"; sleep 1 ; }
+announce() {
+  out "${col_grn}${char_wait}${col_reset}  $*"
+  sleep 1
+}
 progress() {
   ((quiet)) || (
     local screen_width
@@ -210,16 +274,16 @@ lower_case() { echo "$*" | tr '[:upper:]' '[:lower:]'; }
 upper_case() { echo "$*" | tr '[:lower:]' '[:upper:]'; }
 
 slugify() {
-    # slugify <input> <separator>
-    # slugify "Jack, Jill & Clémence LTD"      => jack-jill-clemence-ltd
-    # slugify "Jack, Jill & Clémence LTD" "_"  => jack_jill_clemence_ltd
-    separator="${2:-}"
-    [[ -z "$separator" ]] && separator="-"
-    # shellcheck disable=SC2020
-    echo "$1" |
-        tr '[:upper:]' '[:lower:]' |
-        tr 'àáâäæãåāçćčèéêëēėęîïííīįìłñńôöòóœøōõßśšûüùúūÿžźż' 'aaaaaaaaccceeeeeeeiiiiiiilnnoooooooosssuuuuuyzzz' |
-        awk '{
+  # slugify <input> <separator>
+  # slugify "Jack, Jill & Clémence LTD"      => jack-jill-clemence-ltd
+  # slugify "Jack, Jill & Clémence LTD" "_"  => jack_jill_clemence_ltd
+  separator="${2:-}"
+  [[ -z "$separator" ]] && separator="-"
+  # shellcheck disable=SC2020
+  echo "$1" |
+    tr '[:upper:]' '[:lower:]' |
+    tr 'àáâäæãåāçćčèéêëēėęîïííīįìłñńôöòóœøōõßśšûüùúūÿžźż' 'aaaaaaaaccceeeeeeeiiiiiiilnnoooooooosssuuuuuyzzz' |
+    awk '{
           gsub(/[\[\]@#$%^&*;,.:()<>!?\/+=_]/," ",$0);
           gsub(/^  */,"",$0);
           gsub(/  *$/,"",$0);
@@ -227,27 +291,27 @@ slugify() {
           gsub(/[^a-z0-9\-]/,"");
           print;
           }' |
-        sed "s/-/$separator/g"
+    sed "s/-/$separator/g"
 }
 
 title_case() {
-    # title_case <input> <separator>
-    # title_case "Jack, Jill & Clémence LTD"     => JackJillClemenceLtd
-    # title_case "Jack, Jill & Clémence LTD" "_" => Jack_Jill_Clemence_Ltd
-    separator="${2:-}"
-    # shellcheck disable=SC2020
-    echo "$1" |
-        tr '[:upper:]' '[:lower:]' |
-        tr 'àáâäæãåāçćčèéêëēėęîïííīįìłñńôöòóœøōõßśšûüùúūÿžźż' 'aaaaaaaaccceeeeeeeiiiiiiilnnoooooooosssuuuuuyzzz' |
-        awk '{ gsub(/[\[\]@#$%^&*;,.:()<>!?\/+=_-]/," ",$0); print $0; }' |
-        awk '{
+  # title_case <input> <separator>
+  # title_case "Jack, Jill & Clémence LTD"     => JackJillClemenceLtd
+  # title_case "Jack, Jill & Clémence LTD" "_" => Jack_Jill_Clemence_Ltd
+  separator="${2:-}"
+  # shellcheck disable=SC2020
+  echo "$1" |
+    tr '[:upper:]' '[:lower:]' |
+    tr 'àáâäæãåāçćčèéêëēėęîïííīįìłñńôöòóœøōõßśšûüùúūÿžźż' 'aaaaaaaaccceeeeeeeiiiiiiilnnoooooooosssuuuuuyzzz' |
+    awk '{ gsub(/[\[\]@#$%^&*;,.:()<>!?\/+=_-]/," ",$0); print $0; }' |
+    awk '{
           for (i=1; i<=NF; ++i) {
               $i = toupper(substr($i,1,1)) tolower(substr($i,2))
           };
           print $0;
           }' |
-        sed "s/ /$separator/g" |
-        cut -c1-50
+    sed "s/ /$separator/g" |
+    cut -c1-50
 }
 
 ### interactive
@@ -332,45 +396,45 @@ show_usage() {
   '
 }
 
-check_last_version(){
+check_last_version() {
   (
-  # shellcheck disable=SC2164
-  pushd "$script_install_folder" &> /dev/null
-  if [[ -d .git ]] ; then
-    local remote
-    remote="$(git remote -v | grep fetch | awk 'NR == 1 {print $2}')"
-    progress "Check for latest version - $remote"
-    git remote update &> /dev/null
-    if [[ $(git rev-list --count "HEAD...HEAD@{upstream}" 2>/dev/null) -gt 0 ]] ; then
-      out "There is a more recent update of this script - run <<$script_prefix update>> to update"
+    # shellcheck disable=SC2164
+    pushd "$script_install_folder" &>/dev/null
+    if [[ -d .git ]]; then
+      local remote
+      remote="$(git remote -v | grep fetch | awk 'NR == 1 {print $2}')"
+      progress "Check for latest version - $remote"
+      git remote update &>/dev/null
+      if [[ $(git rev-list --count "HEAD...HEAD@{upstream}" 2>/dev/null) -gt 0 ]]; then
+        out "There is a more recent update of this script - run <<$script_prefix update>> to update"
+      fi
     fi
-  fi
-  # shellcheck disable=SC2164
-  popd &> /dev/null
+    # shellcheck disable=SC2164
+    popd &>/dev/null
   )
 }
 
-update_script_to_latest(){
+update_script_to_latest() {
   # run in background to avoid problems with modifying a running interpreted script
   (
-  sleep 1
-  cd "$script_install_folder" && git pull
+    sleep 1
+    cd "$script_install_folder" && git pull
   ) &
 }
 
 show_tips() {
   ((sourced)) && return 0
   # shellcheck disable=SC2016
-  grep <"${BASH_SOURCE[0]}" -v '$0' \
-  | awk \
+  grep <"${BASH_SOURCE[0]}" -v '$0' |
+    awk \
       -v green="$col_grn" \
       -v yellow="$col_ylw" \
       -v reset="$col_reset" \
       '
       /TIP: /  {$1=""; gsub(/«/,green); gsub(/»/,reset); print "*" $0}
       /TIP:> / {$1=""; print " " yellow $0 reset}
-      ' \
-  | awk \
+      ' |
+    awk \
       -v script_basename="$script_basename" \
       -v script_prefix="$script_prefix" \
       '{
@@ -575,31 +639,31 @@ parse_options() {
   fi
 }
 
-require_binary(){
+require_binary() {
   binary="$1"
   path_binary=$(command -v "$binary" 2>/dev/null)
   [[ -n "$path_binary" ]] && debug "️$require_icon required [$binary] -> $path_binary" && return 0
   words=$(echo "${2:-}" | wc -l)
-  if ((force)) ; then
+  if ((force)); then
     announce "Installing $1 ..."
     case $words in
-      0)  eval "$install_package $1" ;;
-          # require_binary ffmpeg -- binary and package have the same name
-      1)  eval "$install_package $2" ;;
-          # require_binary convert imagemagick -- binary and package have different names
-      *)  eval "${2:-}"
-          # require_binary primitive "go get -u github.com/fogleman/primitive" -- non-standard package manager
+    0) eval "$install_package $1" ;;
+      # require_binary ffmpeg -- binary and package have the same name
+    1) eval "$install_package $2" ;;
+      # require_binary convert imagemagick -- binary and package have different names
+    *) eval "${2:-}" ;;
+      # require_binary primitive "go get -u github.com/fogleman/primitive" -- non-standard package manager
     esac
   else
     case $words in
-      0)  install_instructions="$install_package $1" ;;
-      1)  install_instructions="$install_package $2" ;;
-      *)  install_instructions="${2:-}"
+    0) install_instructions="$install_package $1" ;;
+    1) install_instructions="$install_package $2" ;;
+    *) install_instructions="${2:-}" ;;
     esac
     alert "$script_basename needs [$binary] but it cannot be found"
     alert "1) install package  : $install_instructions"
     alert "2) check path       : export PATH=\"[path of your binary]:\$PATH\""
-    die   "Missing program/script [$binary]"
+    die "Missing program/script [$binary]"
   fi
 }
 
@@ -647,7 +711,7 @@ lookup_script_data() {
   debug "$info_icon Script path: $script_install_path"
   script_install_path=$(recursive_readlink "$script_install_path")
   debug "$info_icon Linked path: $script_install_path"
-  readonly script_install_folder="$( cd -P "$( dirname "$script_install_path" )" && pwd )"
+  readonly script_install_folder="$(cd -P "$(dirname "$script_install_path")" && pwd)"
   debug "$info_icon In folder  : $script_install_folder"
   if [[ -f "$script_install_path" ]]; then
     script_hash=$(hash <"$script_install_path" 8)
@@ -683,7 +747,7 @@ lookup_script_data() {
   Linux | GNU*)
     if [[ $(command -v lsb_release) ]]; then
       # 'normal' Linux distributions
-      os_name=$(lsb_release -i)    # Ubuntu
+      os_name=$(lsb_release -i)    # Ubuntu/Raspbian
       os_version=$(lsb_release -r) # 20.04
     else
       # Synology, QNAP,
@@ -763,12 +827,12 @@ import_env_if_any() {
   done
 }
 
-clean_dotenv(){
+clean_dotenv() {
   local input="$1"
   local output="$1.__.sh"
   [[ ! -f "$input" ]] && die "Input file [$input] does not exist"
   debug "$clean_icon Clean dotenv: [$output]"
-  < "$input" awk '
+  awk <"$input" '
       function ltrim(s) { sub(/^[ \t\r\n]+/, "", s); return s }
       function rtrim(s) { sub(/[ \t\r\n]+$/, "", s); return s }
       function trim(s) { return rtrim(ltrim(s)); }
@@ -785,18 +849,18 @@ clean_dotenv(){
           }
         }
       }
-  ' > "$output"
+  ' >"$output"
   echo "$output"
 }
 
 initialise_output  # output settings
 lookup_script_data # find installation folder
 
-[[ $run_as_root == 1  ]] && [[ $UID -ne 0 ]] && die "user is $USER, MUST be root to run [$script_basename]"
+[[ $run_as_root == 1 ]] && [[ $UID -ne 0 ]] && die "user is $USER, MUST be root to run [$script_basename]"
 [[ $run_as_root == -1 ]] && [[ $UID -eq 0 ]] && die "user is $USER, CANNOT be root to run [$script_basename]"
 
-init_options       # set default values for flags & options
-import_env_if_any  # overwrite with .env if any
+init_options      # set default values for flags & options
+import_env_if_any # overwrite with .env if any
 
 if [[ $sourced -eq 0 ]]; then
   parse_options "$@"    # overwrite with specified options if any

@@ -8,10 +8,9 @@
 
 # siteshow_pi
 
+![siteshow](assets/siteshow_pi.jpg)
 
-A slideshow of URLs in loop, ina browser on a Raspberry Pi.
-
-To be used as e.g. a dashboard display
+Show web pages in carousel on Raspberry Pi - to be used as e.g. a dashboard display
 
 ## 🔥 Usage
 
