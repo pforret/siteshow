@@ -46,13 +46,6 @@ Flags, options and parameters:
   siteshow_pi check
 ```
 
-## ⚡️ Examples
-
-```bash
-> siteshow_pi .
-# start PhpStorm with current folder as project
-```
-
 ## 🚀 Installation
 
 with [basher](https://github.com/basherpm/basher)
