@@ -51,7 +51,8 @@ Flags, options and parameters:
 ```bash
 $ git clone https://github.com/pforret/siteshow_pi.git
 $ cd siteshow_pi
-$ siteshow_pi install
+$ ./siteshow_pi install
+# follow the instructions
 # and now reboot
 ```
 ## 📝 Acknowledgements
