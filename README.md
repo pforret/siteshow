@@ -34,15 +34,15 @@ Flags, options and parameters:
     <action>         : [parameter] action to perform: install/display
 
 ### TIPS & EXAMPLES
-* use siteshow_pi install to install the RPi as a display server
+* use 'siteshow_pi install' to install the RPi as a display server
   siteshow_pi install
-* use siteshow_pi display to .start display
+* use 'siteshow_pi display' to .start display
   siteshow_pi display
-* use siteshow_pi check to check if this script is ready to execute and what values the options/flags are
+* use 'siteshow_pi check' to check if this script is ready to execute and what values the options/flags are
   siteshow_pi check
-* use siteshow_pi env to generate an example .env file
+* use 'siteshow_pi env' to generate an example .env file
   siteshow_pi env > .env
-* use siteshow_pi update to update to the latest version
+* use 'siteshow_pi update' to update to the latest version
   siteshow_pi check
 ```
 
