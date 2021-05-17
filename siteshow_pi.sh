@@ -124,10 +124,18 @@ do_display() {
   "chromium")
     # shellcheck disable=SC2046
     /usr/bin/chromium-browser --noerrdialogs --disable-infobars --kiosk $(list_sites "$site_list") &
+    ## https://pimylifeup.com/raspberry-pi-kiosk/
+    ## https://www.raspberrypi.org/forums/viewtopic.php?t=218996
     ;;
   "firefox")
     # shellcheck disable=SC2046
     firefox -foreground -fullscreen -private $(list_sites "$site_list") &
+    sleep 5
+    # ensure full screen
+    WID=$(xdotool search firefox | head -n1)
+    xdotool windowactivate "$WID"
+    xdotool key F11
+
     ;;
   *)
     die "Unsupported browser [$browser]"
