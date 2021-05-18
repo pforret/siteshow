@@ -84,17 +84,18 @@ do_install() {
   [[ "$os_name" == "Raspbian" ]] || die "Only works on Raspbian"
 
   progress "Clean up old packages"
-  sudo apt-get purge wolfram-engine scratch scratch2 nuscratch sonic-pi idle3 smartsim java-common minecraft-pi libreoffice* -y
-  sudo apt-get clean
-  sudo apt-get autoremove -y
+  sudo apt purge wolfram-engine scratch scratch2 nuscratch sonic-pi idle3 smartsim java-common minecraft-pi libreoffice* -y
+  sudo apt clean
+  sudo apt autoremove -y
 
   progress "Install new packages"
   sudo apt-get update
   sudo apt-get upgrade
-  sudo apt-get install xdotool unclutter sed firefox
+  sudo apt-get install xdotool unclutter sed lightdm x11-xserver-utils firefox-esr chromium
 
   progress "Install service"
-  sudo raspi-config
+  #sudo raspi-config
+  service_file > /lib/systemd/system/kiosk.service
   sudo systemctl enable kiosk.service
   sudo systemctl start kiosk.service
   # shellcheck disable=SC2154
@@ -116,12 +117,12 @@ do_display() {
   xset s off
   xset -dpms
   unclutter -idle 0.5 -root &
-  sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' /home/pi/.config/chromium/Default/Preferences
-  sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/'   /home/pi/.config/chromium/Default/Preferences
 
   # shellcheck disable=SC2154
   case "$browser" in
   "chromium")
+    sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' /home/pi/.config/chromium/Default/Preferences
+    sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/'   /home/pi/.config/chromium/Default/Preferences
     # shellcheck disable=SC2046
     /usr/bin/chromium-browser --noerrdialogs --disable-infobars --kiosk $(list_sites "$site_list") &
     ## https://pimylifeup.com/raspberry-pi-kiosk/

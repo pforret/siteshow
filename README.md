@@ -6,7 +6,7 @@
 ![GH License](https://img.shields.io/github/license/pforret/siteshow_pi)
 [![basher install](https://img.shields.io/badge/basher-install-white?logo=gnu-bash&style=flat)](https://basher.gitparade.com/package/)
 
-# siteshow_pi
+# siteshow
 
 ![siteshow](assets/siteshow_pi.jpg)
 
@@ -15,17 +15,17 @@ Show web pages in carousel on Raspberry Pi - to be used as e.g. a dashboard disp
 ## 🔥 Usage
 
 ```
-Program: siteshow_pi 0.1.0 by peter@forret.com
-Updated: May 16 22:54:48 2021
+Program: siteshow 0.2.0 by peter@forret.com
+Updated: May 18 00:00:45 2021
 Description: This is my script siteshow_pi
-Usage: siteshow_pi [-h] [-q] [-v] [-f] [-l <log_dir>] [-t <tmp_dir>] [-B <browser>] [-C <category>] [-D <display>] [-I <install>] [-W <wait>] <action>
+Usage: siteshow [-h] [-q] [-v] [-f] [-l <log_dir>] [-t <tmp_dir>] [-B <browser>] [-C <category>] [-D <display>] [-I <install>] [-W <wait>] <action>
 Flags, options and parameters:
     -h|--help        : [flag] show usage [default: off]
     -q|--quiet       : [flag] no output [default: off]
     -v|--verbose     : [flag] output more [default: off]
     -f|--force       : [flag] do not ask for confirmation (always yes) [default: off]
-    -l|--log_dir <?> : [option] folder for log files   [default: /Users/pforret/log/siteshow_pi]
-    -t|--tmp_dir <?> : [option] folder for temp files  [default: /tmp/siteshow_pi]
+    -l|--log_dir <?> : [option] folder for log files   [default: /Users/pforret/log/siteshow]
+    -t|--tmp_dir <?> : [option] folder for temp files  [default: /tmp/siteshow]
     -B|--browser <?> : [option] browser to use: chromium/firefox  [default: chromium]
     -C|--category <?>: [option] screen category
     -D|--display <?> : [option] display ID
